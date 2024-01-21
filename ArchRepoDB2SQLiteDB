@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# Arch Linux Repo DB to Sqlite DB
+#
+
+import tempfile
+import tarfile
+import os
+import re
+import sqlite3
+import shutil
+
+# Creating temporary folders
+work_dir = tempfile.mkdtemp()
+
+# Creating a database in memory
+conn_mem = sqlite3.connect(':memory:')
+cmc = conn_mem.cursor()
+cmc.execute('PRAGMA synchronous = OFF')
+cmc.execute('PRAGMA journal_mode = OFF')
+
+# Official repository
+repo_list = ['core', 'extra']
+for repo in repo_list:
+    # Create a table for each repository
+    cmc.execute(f'CREATE TABLE cmc_{repo} (pkg_name TEXT, file_path TEXT)')
+    # Decompress {repo}.files
+    repo_path = f'{work_dir}/{repo}'
+    with tarfile.open(f'/var/lib/pacman/sync/{repo}.files', 'r:gz') as tar:
+        tar.extractall(repo_path)
+
+    # Traverse the packages in the repository
+    for pkg_in_repo in os.listdir(repo_path):
+        pkg_full_path = os.path.join(repo_path, pkg_in_repo)
+        if os.path.isdir(pkg_full_path):
+            # Get accurate package name through desc file
+            read_desc = open(f'{pkg_full_path}/desc', mode='r', encoding='utf-8').read()
+            pkg_name = re.search('%NAME%\n([0-9a-z-]+)', read_desc).group(1)
+            # Get a list of files through files file.
+            files_list = open(f'{pkg_full_path}/files', mode='r', encoding='utf-8')
+            for file in files_list.readlines()[1:]:
+                file_path = f'/{file.strip()}'
+                if not file_path.endswith('/'):
+                    # Insert data
+                    ins_data = [(pkg_name, file_path)]
+                    cmc.executemany(f'INSERT INTO cmc_{repo} VALUES (?, ?)', ins_data)
+                    conn_mem.commit()
+
+# Dump the in-memory database to the local
+conn_local = sqlite3.connect(f'arch-repo.db')
+with conn_mem, conn_local:
+    conn_mem.backup(conn_local)
+
+# Clean up
+conn_mem.close()
+conn_local.close()
+shutil.rmtree(work_dir)
