@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+#
+# pacman -F
+#
+
+import sys
+import sqlite3
+
+if len(sys.argv) < 2:
+    print("Usage: pacman-F '/path/to/your/file'")
+    sys.exit(1)
+search_path = sys.argv[1]
+
+conn_repo = sqlite3.connect('arch-repo.db')
+query = f"SELECT pkg_name FROM cmc_core WHERE file_path = ?;"
+result = conn_repo.execute(query, (search_path,)).fetchone()
+
+if result:
+    print(result[0])
+else:
+    pass
+
+conn_repo.close()
