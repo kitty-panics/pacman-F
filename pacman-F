@@ -15,11 +15,16 @@ arch_repo = sys.argv[1]
 search_path = sys.argv[2]
 
 conn_repo = sqlite3.connect(arch_repo)
-query = f"SELECT pkg_name FROM cmc_core WHERE file_path = ?;"
-result = conn_repo.execute(query, (search_path,)).fetchone()
+crc = conn_repo.cursor()
+query = '''
+SELECT pkg_name FROM cmc_core WHERE file_path = ?
+UNION
+SELECT pkg_name FROM cmc_extra WHERE file_path = ?
+'''
+result = crc.execute(query, (search_path,search_path)).fetchall()
 
 if result:
-    print(result[0])
+    print(result[0][0])
 else:
     pass
 
