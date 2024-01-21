@@ -8,12 +8,13 @@
 import sys
 import sqlite3
 
-if len(sys.argv) < 2:
-    print("Usage: pacman-F '/path/to/your/file'")
+if len(sys.argv) < 3:
+    print("Usage: pacman-F '/path/to/arch-repo.db' '/path/to/your/file'")
     sys.exit(1)
-search_path = sys.argv[1]
+arch_repo = sys.argv[1]
+search_path = sys.argv[2]
 
-conn_repo = sqlite3.connect('arch-repo.db')
+conn_repo = sqlite3.connect(arch_repo)
 query = f"SELECT pkg_name FROM cmc_core WHERE file_path = ?;"
 result = conn_repo.execute(query, (search_path,)).fetchone()
 
