@@ -10,8 +10,6 @@ import tarfile
 import os
 import re
 import sqlite3
-import gzip
-from io import BytesIO
 import shutil
 
 # Creating temporary folders
@@ -41,17 +39,21 @@ for repo in repo_list:
             read_desc = open(f'{pkg_full_path}/desc', mode='r', encoding='utf-8').read()
             pkg_name = re.search('%NAME%\n([0-9a-z-]+)', read_desc).group(1)
             # Get a list of files through files file.
-            read_files = open(f'{pkg_full_path}/files', mode='r', encoding='utf-8').readlines()[1:]
-            file_path = [f'/{file.strip()}' for file in read_files if not file.strip().endswith('/')]
-            # Insert data
-            ins_data = [(pkg_name, str(file_path))]
-            cmc.executemany(f'INSERT INTO cmc_{repo} VALUES (?, ?)', ins_data)
-            conn_mem.commit()
+            files_list = open(f'{pkg_full_path}/files', mode='r', encoding='utf-8')
+            for file in files_list.readlines()[1:]:
+                file_path = f'/{file.strip()}'
+                if not file_path.endswith('/'):
+                    # Insert data
+                    ins_data = [(pkg_name, file_path)]
+                    cmc.executemany(f'INSERT INTO cmc_{repo} VALUES (?, ?)', ins_data)
+                    conn_mem.commit()
 
-# Dump SQLite DB in memory into .gz file
-with gzip.open('arch-repo.db.gz', 'wb', compresslevel=9) as f:
-    f.write(b'\n'.join(item.encode('utf-8') for item in conn_mem.iterdump()))
+# Dump the in-memory database to the local
+conn_local = sqlite3.connect(f'arch-repo.db')
+with conn_mem, conn_local:
+    conn_mem.backup(conn_local)
 
 # Clean up
 conn_mem.close()
+conn_local.close()
 shutil.rmtree(work_dir)

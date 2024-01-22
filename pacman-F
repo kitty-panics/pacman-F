@@ -6,28 +6,43 @@
 #
 
 import sys
+import ast
+import gzip
 import sqlite3
+from io import BytesIO
 
+# Parameter judgment
 if len(sys.argv) < 3:
-    print("Usage: pacman-F '/path/to/arch-repo.db' '/path/to/your/file'")
+    print("Usage: pacman-F '/path/to/arch-repo.db.gz' '/path/to/your/file'")
     sys.exit(1)
-arch_repo = sys.argv[1]
-search_path = sys.argv[2]
+repo_db_gz = sys.argv[1]
+search_path = ast.literal_eval(sys.argv[2]) # String to list
 
-conn_repo = sqlite3.connect(arch_repo)
-crc = conn_repo.cursor()
+# Decompress .gz file to memory
+with gzip.open(repo_db_gz, 'rb') as gz:
+    gz_content = gz.read()
+
+# Load SQLite in memory
+conn_mem = sqlite3.connect(':memory:')
+conn_mem.executescript(gz_content.decode('utf-8'))
+crc = conn_mem.cursor()
+
 query = '''
-SELECT pkg_name, 'cmc_core' AS table_name FROM cmc_core WHERE file_path = ?
+SELECT pkg_name, 'cmc_core' AS table_name FROM cmc_core WHERE file_path like ?
 UNION
-SELECT pkg_name, 'cmc_extra' AS table_name FROM cmc_extra WHERE file_path = ?
+SELECT pkg_name, 'cmc_extra' AS table_name FROM cmc_extra WHERE file_path like ?
 '''
-crc.execute(query, (search_path,search_path))
-result = crc.fetchall()
-if result:
-    repo_name = result[0][1].replace("cmc_", "")
-    pkg_name = result[0][0]
-    print(f'{repo_name}/{pkg_name}')
-else:
-    pass
+# Traverse the list (search_path) and query
+for path in search_path:
+    crc.execute(query, (f"%'{path}'%", f"%'{path}'%"))
+    result = crc.fetchall()
 
-conn_repo.close()
+    if result:
+        repo_name = result[0][1].replace("cmc_", "")
+        pkg_name = result[0][0]
+        print(f'{repo_name}/{pkg_name}')
+    else:
+        pass
+
+# Clean up
+conn_mem.close()
