@@ -9,7 +9,7 @@ import sys
 import sqlite3
 
 if len(sys.argv) < 3:
-    print("Usage: pacman-F '/path/to/arch-repo.db' '/path/to/your/file'")
+    print("Usage: pacman-F '/path/to/arch-repo.db' '/path/to/search/file'")
     sys.exit(1)
 arch_repo = sys.argv[1]
 search_path = sys.argv[2]

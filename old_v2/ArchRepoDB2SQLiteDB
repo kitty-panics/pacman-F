@@ -9,15 +9,25 @@ import tempfile
 import tarfile
 import os
 import re
+import sqlite3
 import gzip
+from io import BytesIO
 import shutil
 
 # Creating temporary folders
 work_dir = tempfile.mkdtemp()
 
+# Creating a database in memory
+conn_mem = sqlite3.connect(':memory:')
+cmc = conn_mem.cursor()
+cmc.execute('PRAGMA synchronous = OFF')
+cmc.execute('PRAGMA journal_mode = OFF')
+
 # Official repository
 repo_list = ['core', 'extra']
 for repo in repo_list:
+    # Create a table for each repository
+    cmc.execute(f'CREATE TABLE cmc_{repo} (pkg_name TEXT, file_path TEXT)')
     # Decompress {repo}.files
     repo_path = f'{work_dir}/{repo}'
     with tarfile.open(f'/var/lib/pacman/sync/{repo}.files', 'r:gz') as tar:
@@ -33,9 +43,15 @@ for repo in repo_list:
             # Get a list of files through files file.
             read_files = open(f'{pkg_full_path}/files', mode='r', encoding='utf-8').readlines()[1:]
             file_path = [f'/{file.strip()}' for file in read_files if not file.strip().endswith('/')]
-            # Write data
-            with gzip.open('arch-repo.db.gz', 'at', compresslevel=9) as gz:
-                gz.write(f'{repo}/{pkg_name}: {file_path}\n')
+            # Insert data
+            ins_data = [(pkg_name, str(file_path))]
+            cmc.executemany(f'INSERT INTO cmc_{repo} VALUES (?, ?)', ins_data)
+            conn_mem.commit()
+
+# Dump SQLite DB in memory into .gz file
+with gzip.open('arch-repo.db.gz', 'wb', compresslevel=9) as f:
+    f.write(b'\n'.join(item.encode('utf-8') for item in conn_mem.iterdump()))
 
 # Clean up
+conn_mem.close()
 shutil.rmtree(work_dir)
