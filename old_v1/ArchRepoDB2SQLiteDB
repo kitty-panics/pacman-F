@@ -37,7 +37,7 @@ for repo in repo_list:
         if os.path.isdir(pkg_full_path):
             # Get accurate package name through desc file
             read_desc = open(f'{pkg_full_path}/desc', mode='r', encoding='utf-8').read()
-            pkg_name = re.search('%NAME%\n([0-9a-z-]+)', read_desc).group(1)
+            pkg_name = re.search('%NAME%\n(.+)', read_desc).group(1)
             # Get a list of files through files file.
             files_list = open(f'{pkg_full_path}/files', mode='r', encoding='utf-8')
             for file in files_list.readlines()[1:]:
